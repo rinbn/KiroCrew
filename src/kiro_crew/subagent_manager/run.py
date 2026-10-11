@@ -2233,6 +2233,10 @@ class RunEventCoordinator(ManagerComponent):
         eff_effort = plan.eff_effort
         if eff_effort:
             extra_kwargs["reasoning_effort_override"] = eff_effort
+        # The per-spawn backend (spawn_run ``backend``). ``is not None``: ``""``
+        # is a Kiro request and must reach the factory under a non-Kiro default.
+        if info.backend is not None:
+            extra_kwargs["backend_override"] = info.backend
         if info.bare:
             extra_kwargs["bare"] = True
         if info.allowed_tools:
@@ -4040,7 +4044,8 @@ class RunEventCoordinator(ManagerComponent):
         """Decide whether a subagent should use the shared-runtime path.
 
         All must hold: session_sharing config True; parent session exists and
-        is ACP/kiro-backed (not CC); not a CC-specific spawn (model/allowed_tools/bare).
+        is ACP/kiro-backed (not CC); not a CC-specific spawn (model/allowed_tools/bare);
+        no per-spawn backend.
         """
         # Member capability and native prompt documents are prepared at launch.
         if info._force_dedicated:
@@ -4054,6 +4059,10 @@ class RunEventCoordinator(ManagerComponent):
         except Exception:
             return False
         if info.model or info.allowed_tools or info.bare:
+            return False
+        # The shared runtime is the parent's own process, on the parent's backend:
+        # a run asked onto a backend of its own needs a process of its own.
+        if info.backend is not None:
             return False
         if not info.parent_session_key:
             return False
